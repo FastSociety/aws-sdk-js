@@ -17,4 +17,3 @@ lib/core.js
 lib/**/*.js
 -
 README.md
-UPGRADING.md

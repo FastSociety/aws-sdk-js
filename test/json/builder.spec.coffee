@@ -3,19 +3,13 @@ AWS = helpers.AWS
 
 describe 'AWS.JSON.Builder', ->
 
-  builder = new AWS.JSON.Builder()
   timestampFormat = 'iso8601'
-  api = null
 
-  beforeEach ->
-    api = new AWS.Model.Api
-      metadata:
-        timestampFormat: timestampFormat
-        protocol: 'json'
-
-  build = (rules, params) ->
-    shape = AWS.Model.Shape.create(rules, api: api)
-    builder.build(params, shape)
+  build = (rules, params, options) ->
+    options = {} if (!options)
+    options.timestampFormat = timestampFormat
+    builder = new AWS.JSON.Builder(rules, options)
+    builder.build(params)
 
   describe 'build', ->
 
@@ -29,8 +23,10 @@ describe 'AWS.JSON.Builder', ->
           Items:
             type: 'structure'
             members:
-              A: type: 'string'
-              B: type: 'string'
+              A:
+                type: 'string'
+              B:
+                type: 'string'
 
       it 'translates input', ->
         params = { Items: { A: 'a', B: 'b' } }
@@ -48,11 +44,11 @@ describe 'AWS.JSON.Builder', ->
         members:
           Items:
             type: 'list'
-            member:
+            members:
               type: 'string'
 
       it 'translates input', ->
-        params = Items: ['a', 'b', 'c']
+        params = { Items: ['a','b','c'] }
         expect(build(rules, params)).toEqual('{"Items":["a","b","c"]}')
 
       it 'ignores null', ->
@@ -67,8 +63,6 @@ describe 'AWS.JSON.Builder', ->
         members:
           Items:
             type: 'map'
-            key: type: 'string'
-            value: type: 'string'
 
       it 'translates maps', ->
         params = { Items: { A: 'a', B: 'b' } }
@@ -84,7 +78,7 @@ describe 'AWS.JSON.Builder', ->
       rules =
         type: 'structure'
         members:
-          Items: type: 'map', value: type: 'integer'
+          Items: type: 'map', members: type: 'integer'
       now = new Date()
       now.setMilliseconds(100)
       params = Items: MyKey: "5", MyOtherKey: "10"
@@ -102,7 +96,9 @@ describe 'AWS.JSON.Builder', ->
                 type: 'timestamp'
       now = new Date()
       now.setMilliseconds(100)
-      params = Build: When: now
+      params =
+        Build:
+          When: now
       formatted = AWS.util.date.iso8601(now).replace(/\.\d+Z$/, '')
       expect(build(rules, params)).toMatch('\\{"Build":\\{"When":"'+formatted+'\\.\\d+Z"\\}\\}')
 

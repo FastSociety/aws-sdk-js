@@ -18,10 +18,6 @@ Feature: Amazon Elastic Compute Cloud
     """
     And the status code should be 400
 
-  Scenario: Encrypted CopySnapshot
-    Given I attempt to copy an encrypted snapshot across regions
-    Then the copy snapshot attempt should be successful
-
   @pagination
   Scenario: Paginating responses
     Given I paginate the "describeReservedInstancesOfferings" operation with limit 20 and max pages 3

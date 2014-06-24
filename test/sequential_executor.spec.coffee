@@ -105,6 +105,6 @@ describe 'AWS.SequentialExecutor', ->
         domain.run ->
           service = new MockService()
           service.makeRequest 'operationName', ->
-            invalidCode
+            throw 'ERROR'
 
-        expect(thrown.name).toEqual('ReferenceError')
+        expect(thrown).toEqual('ERROR')

@@ -3,12 +3,12 @@ AWS = helpers.AWS
 Buffer = AWS.util.Buffer
 
 describe 'AWS.ParamValidator', ->
-  [members, input] = [{}, {}]
+  [members, rules] = [{}, {}]
 
   validate = (params) ->
-    r = input
+    r = rules
     if r && !r.xml && !r.payload
-      r = AWS.Model.Shape.create(input, {api: {}})
+      r = type: 'structure', members: rules
     new AWS.ParamValidator().validate(r, params)
 
   expectValid = (params) ->
@@ -19,12 +19,16 @@ describe 'AWS.ParamValidator', ->
       [message, params] = [undefined, message]
     expect(-> validate(params)).toThrow(message)
 
-  # empty input (nil or {}) means no arguments are accepted
-  describe 'empty input', ->
+  # empty rules (nil or {}) means no arguments are accepted
+  describe 'empty rules', ->
     beforeEach ->
-      input = type: 'structure'
+      rules = {}
 
-    it 'accepts an empty hash when the input are an empty hash', ->
+    it 'accepts an empty hash when the rules are nil', ->
+      rules = null
+      expectValid {}
+
+    it 'accepts an empty hash when the rules are an empty hash', ->
       expectValid {}
 
     it 'does not accept params in the given hash', ->
@@ -34,9 +38,7 @@ describe 'AWS.ParamValidator', ->
   # are case sensitive.
   describe 'param keys', ->
     beforeEach ->
-      input =
-        members:
-          foo: {}, bar: type: 'string'
+      rules = foo: {}, bar: type: 'string'
 
     it 'accepts string keys', ->
       expectValid foo: 'foo'
@@ -46,22 +48,21 @@ describe 'AWS.ParamValidator', ->
       expectError Bar: 'bar'
       expectError Foo: 'foo'
 
-  # Params not described in the input are not accepted.
+  # Params not described in the rules are not accepted.
   describe 'unexpected params', ->
     beforeEach ->
-      input =
-        members:
-          string1: {}
-          string2: {}
-          hash:
-            type: 'structure'
-            members:
-              good: {}
+      rules =
+        string1: {}
+        string2: {}
+        hash:
+          type: 'structure'
+          members:
+            good: {}
 
     it 'throws an ArgumentError for un-described params', ->
       expectError string3: 'xyz'
 
-    it 'rejects nested params that are not described in the input', ->
+    it 'rejects nested params that are not described in the rules', ->
       expectValid hash: good: 'abc'
       expectError hash: bad: 'abc'
 
@@ -72,14 +73,11 @@ describe 'AWS.ParamValidator', ->
   # provided, then missing nested required params will not raise an error.
   describe 'required params', ->
     beforeEach ->
-      input =
-        required: ['req']
-        members:
-          req: type: 'string'
-          opt:
-            type: 'structure'
-            required: ['req']
-            members: req: type: 'string'
+      rules =
+        req: required: true
+        opt:
+          type: 'structure'
+          members: req: required: true
 
     it 'throws an error if a top-level required param is omitted', ->
       expectError {}
@@ -100,30 +98,28 @@ describe 'AWS.ParamValidator', ->
       expectValid req: ''
 
     it 'accepts 0 in required params', ->
-      input.members.req.type = 'integer'
+      rules.req.type = 'integer'
       expectValid req: 0
 
     it 'accepts false in required params', ->
-      input.members.req.type = 'boolean'
+      rules.req.type = 'boolean'
       expectValid req: false
 
   # The root params is always a structure (hash) by default, but
   # you can also nest structures.
   describe 'structure', ->
     beforeEach ->
-      input =
-        members:
-          hash1:
-            type: 'structure'
-            members:
-              param1: {}
-              param2: {}
-              hash2:
-                type: 'structure'
-                required: ['param4']
-                members:
-                  param3: type: 'boolean'
-                  param4: type: 'integer'
+      rules =
+        hash1:
+          type: 'structure'
+          members:
+            param1: {}
+            param2: {}
+            hash2:
+              type: 'structure'
+              members:
+                param3: type: 'boolean'
+                param4: type: 'integer', required: true
 
     it 'accepts hashes', ->
       expectValid hash1: {}
@@ -153,9 +149,7 @@ describe 'AWS.ParamValidator', ->
   describe 'list', ->
     beforeEach ->
       members = {}
-      input =
-        members:
-          array: type: 'list', member: members
+      rules = array: type: 'list', members: members
 
     it 'accepts an array for list params', ->
       expectValid array: []
@@ -172,9 +166,7 @@ describe 'AWS.ParamValidator', ->
   describe 'map', ->
     beforeEach ->
       members = {}
-      input =
-        members:
-          hash: type: 'map', value: members
+      rules = hash: type: 'map', members: members
 
     it 'accepts maps', ->
       expectValid hash: {}
@@ -191,7 +183,7 @@ describe 'AWS.ParamValidator', ->
     it 'supports nested params', ->
       members.type = 'structure'
       members.members =
-        param1: type: 'list', member: type: 'string'
+        param1: type: 'list'
         param2: type: 'integer'
         param3: type: 'structure', members: param4: {}
 
@@ -203,7 +195,7 @@ describe 'AWS.ParamValidator', ->
 
   describe 'boolean', ->
     beforeEach ->
-      input = members: param: type: 'boolean'
+      rules = param: type: 'boolean'
 
     it 'accepts true', ->
       expectValid param: true
@@ -219,7 +211,7 @@ describe 'AWS.ParamValidator', ->
 
   describe 'timestamp', ->
     beforeEach ->
-      input = members: param: type: 'timestamp'
+      rules = param: type: 'timestamp'
 
     it 'accepts Date objects', ->
       expectValid param: new Date()
@@ -239,7 +231,7 @@ describe 'AWS.ParamValidator', ->
 
   describe 'string', ->
     beforeEach ->
-      input = members: param: type: 'string'
+      rules = param: type: 'string'
 
     it 'accepts strings', ->
       expectValid param: 'abc'
@@ -257,7 +249,7 @@ describe 'AWS.ParamValidator', ->
 
   describe 'float', ->
     beforeEach ->
-      input = members: param: type: 'float'
+      rules = param: type: 'float'
 
     it 'accepts floats', ->
       expectValid param: 1.23
@@ -276,7 +268,7 @@ describe 'AWS.ParamValidator', ->
 
   describe 'integer', ->
     beforeEach ->
-      input = members: param: type: 'integer'
+      rules = param: type: 'integer'
 
     it 'accepts integers', ->
       expectValid param: 123
@@ -292,7 +284,7 @@ describe 'AWS.ParamValidator', ->
 
   describe 'base64', ->
     beforeEach ->
-      input = members: param: type: 'base64'
+      rules = param: type: 'base64'
 
     it 'accepts strings', ->
       expectValid param: 'abc'
@@ -323,7 +315,7 @@ describe 'AWS.ParamValidator', ->
 
   describe 'binary', ->
     beforeEach ->
-      input = members: param: type: 'binary'
+      rules = param: type: 'binary'
 
     it 'accepts strings', ->
       expectValid param: 'abc'
@@ -342,30 +334,29 @@ describe 'AWS.ParamValidator', ->
       expectError param: {}
 
   describe 'payloads', ->
-    it 'validates from payload key if input include an xml element', ->
-      input =
+    it 'validates from payload key if rules include an xml element', ->
+      rules =
+        xml: 'body'
         type: 'structure'
-        required: ['body']
-        payload: 'body'
         members:
           notbody: type: 'string'
           body:
+            required: true
             type: 'structure'
             members: enabled: type: 'boolean'
 
-      expectValid body: { enabled: true }, notbody: 'true'
+      expectValid enabled: true, notbody: 'true'
 
   describe 'error messages', ->
     beforeEach ->
-      input =
-        members:
-          config:
-            type: 'structure'
-            members:
-              settings:
-                type: 'structure'
-                members:
-                  enabled: type: 'boolean'
+      rules =
+        config:
+          type: 'structure'
+          members:
+            settings:
+              type: 'structure'
+              members:
+                enabled: type: 'boolean'
 
     it 'throws helpful messages for unknown params', ->
       msg = 'Unexpected key \'fake\' found in params'
@@ -377,7 +368,7 @@ describe 'AWS.ParamValidator', ->
 
     it 'throws helpful messages for missing required params', ->
       msg = 'Missing required key \'needed\' in params.config.settings'
-      input.members.config.members.settings.required = ['needed']
+      rules.config.members.settings.members.needed = required: true
       expectError msg, config: settings: {}
 
     it 'throws helpul messages for invalid structures', ->
@@ -386,14 +377,14 @@ describe 'AWS.ParamValidator', ->
 
     it 'throws helpul messages for invalid lists', ->
       msg = 'Expected params.config.settings.tags to be an Array'
-      input.members.config.members.settings.members.tags = type: 'list', member: {}
+      rules.config.members.settings.members.tags = type: 'list', members: {}
       expectError msg, config: settings: tags: 123
 
     it 'throws helpful messages for invalid list members', ->
       msg = 'Expected params.config.items[1].value to be a number'
-      input.members.config.members.items =
+      rules['config']['members']['items'] =
         type: 'list',
-        member:
+        members:
           type: 'structure',
           members:
             value: type: 'integer'
@@ -403,35 +394,40 @@ describe 'AWS.ParamValidator', ->
 
     it 'throws helpful messages for invalid maps', ->
       msg = 'Expected params.config.settings.tags to be a map'
-      input.members.config.members.settings.members.tags =
+      rules['config']['members']['settings']['members']['tags'] =
         type: 'map',
-        key: {}
-        value: {}
+        members: {}
 
       expectError msg, config: settings: tags: '123'
 
     it 'throws helpful messages for invalid map members', ->
       msg = 'Expected params.config.counts[\'red\'] to be a number'
-      input.members.config.members.counts =
+      rules['config']['members']['counts'] =
         type: 'map',
-        value: type: 'integer'
+        members: type: 'integer'
 
       expectError msg, config: counts: red: true
 
     it 'throws helpful messages for invalid strings', ->
       msg = "Expected params.config.settings.name to be a string"
-      input.members.config.members.settings.members.name = type: 'string'
+      rules['config']['members']['settings']['members']['name'] =
+        type: 'string'
+
       expectError msg, config: settings: name: 123
 
     it 'throws helpful messages for invalid integers', ->
       msg = "Expected params.config.settings.count to be a number"
-      input.members.config.members.settings.members.count = type: 'integer'
+      rules['config']['members']['settings']['members']['count'] =
+        type: 'integer'
+
       expectError msg, config: settings: count: 'invalid-integer'
 
     it 'throws helpful messages for invalid timestamps', ->
       msg = "Expected params.config.settings.when to be a " +
             "Date object, ISO-8601 string, or a UNIX timestamp"
-      input.members.config.members.settings.members.when = type: 'timestamp'
+      rules['config']['members']['settings']['members']['when'] =
+        type: 'timestamp'
+
       expectError msg, config: settings: when: 'invalid-date'
 
     it 'throws helpful messages for invalid booleans', ->
@@ -440,17 +436,23 @@ describe 'AWS.ParamValidator', ->
 
     it 'throws helpful messages for invalid floats', ->
       msg = "Expected params.config.settings.value to be a number"
-      input.members.config.members.settings.members.value = type: 'float'
+      rules.config.members.settings.members.value =
+        type: 'float'
+
       expectError msg, config: settings: value: 'invalid-float'
 
     it 'throws helpful messages for invalid base64 params', ->
       msg = "Expected params.config.settings.data to be a " +
             "string, Buffer, Stream, Blob, or typed array object"
-      input.members.config.members.settings.members.data = type: 'base64'
+      rules.config.members.settings.members.data =
+        type: 'base64'
+
       expectError msg, config: settings: data: 123
 
     it 'throws helpful messages for invalid binary params', ->
       msg = "Expected params.config.settings.data to be a " +
             "string, Buffer, Stream, Blob, or typed array object"
-      input.members.config.members.settings.members.data = type: 'binary'
+      rules.config.members.settings.members.data =
+        type: 'binary'
+
       expectError msg, config: settings: data: 123

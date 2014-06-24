@@ -3,18 +3,11 @@ helpers = require('../helpers'); AWS = helpers.AWS
 describe 'AWS.XML.Parser', ->
 
   parse = (xml, rules, callback) ->
-    if rules
-      shape = AWS.Model.Shape.create(rules, api: {})
-    else
-      shape = {}
-    callback.call(this, new AWS.XML.Parser().parse(xml, shape))
+    callback.call(this, new AWS.XML.Parser(rules).parse(xml))
 
   describe 'default behavior', ->
 
-    rules = null # no rules, rely on default parsing behavior
-
-    it 'returns empty object when string is empty', ->
-      parse '', null, (data) -> expect(data).toEqual({})
+    rules = {} # no rules, rely on default parsing behavior
 
     it 'returns an empty object from an empty document', ->
       xml = '<xml/>'
@@ -61,22 +54,6 @@ describe 'AWS.XML.Parser', ->
       parse xml, rules, (data) ->
         expect(data).toEqual({Item:{}})
 
-    it 'parses attributes from tags', ->
-      xml = '<xml xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-             <Item xsi:name="name"></Item></xml>'
-      rules =
-        type: 'structure'
-        members:
-          Item:
-            type: 'structure'
-            members:
-              Name:
-                type: 'string'
-                xmlAttribute: true
-                locationName: 'xsi:name'
-      parse xml, rules, (data) ->
-        expect(data).toEqual({Item:{Name: 'name'}})
-
   describe 'lists', ->
 
     it 'returns empty lists as []', ->
@@ -86,7 +63,7 @@ describe 'AWS.XML.Parser', ->
         members:
           items:
             type: 'list'
-            member:
+            members:
               type: 'string'
       parse xml, rules, (data) ->
         expect(data).toEqual({items:[]})
@@ -98,7 +75,7 @@ describe 'AWS.XML.Parser', ->
         members:
           items:
             type: 'list'
-            member:
+            members:
               type: 'string'
       parse xml, rules, (data) ->
         expect(data).toEqual({items:[]})
@@ -117,11 +94,11 @@ describe 'AWS.XML.Parser', ->
         members:
           items:
             type: 'list'
-            member: {}
+            members: {}
       parse xml, rules, (data) ->
         expect(data).toEqual({items:['abc','xyz']})
 
-    it 'observes list member names when present', ->
+    it 'Observes list member names when present', ->
       xml = """
       <xml>
         <items>
@@ -135,8 +112,8 @@ describe 'AWS.XML.Parser', ->
         members:
           items:
             type: 'list'
-            member:
-              locationName: 'item'
+            members:
+              name: 'item'
       parse xml, rules, (data) ->
         expect(data).toEqual({items:['abc','xyz']})
 
@@ -154,7 +131,7 @@ describe 'AWS.XML.Parser', ->
         members:
           People:
             type: 'list'
-            member:
+            members:
               type: 'structure'
               members:
                 Name:
@@ -176,9 +153,9 @@ describe 'AWS.XML.Parser', ->
         members:
           People:
             type: 'list'
-            member:
+            members:
               type: 'structure'
-              locationName: 'Person'
+              name: 'Person'
               members:
                 Name:
                   type: 'string'
@@ -204,12 +181,11 @@ describe 'AWS.XML.Parser', ->
           person:
             type: 'structure'
             members:
-              name: {}
-              aka:
+              alias:
+                name: 'aka'
                 type: 'list'
                 flattened: true
-                member:
-                  locationName: 'alias'
+                members: {}
       parse xml, rules, (data) ->
         expect(data).toEqual({person:{name:'Unknown',aka:['John Doe', 'Jane Doe']}})
 
@@ -230,18 +206,14 @@ describe 'AWS.XML.Parser', ->
       rules =
         type: 'structure'
         members:
-          name:
-            type: 'string'
-          values:
+          complexValue:
             type: 'list'
             flattened: true
-            member:
-              locationName: 'complexValue'
+            name: 'values'
+            members:
               type: 'structure'
-              members:
-                a: type: 'integer'
-                b: type: 'integer'
-      values = {name:'Name',values:[{a:1,b:2},{a:3,b:4}]}
+              members: {}
+      values = {name:'Name',values:[{a:'1',b:'2'},{a:'3',b:'4'}]}
       parse xml, rules, (data) ->
         expect(data).toEqual(values)
 
@@ -258,14 +230,13 @@ describe 'AWS.XML.Parser', ->
         members:
           Count:
             type: 'integer'
-          People:
+          Person:
             type: 'list'
             flattened: true
-            member:
+            name: 'People'
+            members:
               type: 'structure'
-              locationName: 'Person'
-              members:
-                Name: {}
+              name: 'Person'
       parse xml, rules, (data) ->
         expect(data).toEqual({Count:2,People:[{Name:'abc'},{Name:'xyz'}]})
 
@@ -297,7 +268,7 @@ describe 'AWS.XML.Parser', ->
           members:
             SummaryMap:
               type: 'map'
-              value:
+              members:
                 type: 'integer'
         parse xml, rules, (data) ->
           expect(data).toEqual(SummaryMap:{Groups:31,GroupsQuota:50,UsersQuota:150})
@@ -326,69 +297,69 @@ describe 'AWS.XML.Parser', ->
         rules =
           type: 'structure'
           members:
-            Summary:
+            SummaryMap:
               type: 'map'
-              locationName: 'SummaryMap',
-              key:
-                locationName: 'Property'
-              value:
+              name: 'Summary',
+              keys:
+                name: 'Property'
+              members:
                 type: 'integer'
-                locationName: 'Count'
+                name: 'Count'
         parse xml, rules, (data) ->
           expect(data).toEqual(Summary:{Groups:31,GroupsQuota:50,UsersQuota:150})
 
-    describe 'flattened', ->
-      it 'expects key and value elements by default', ->
-        xml = """
-        <xml>
-          <Attributes>
-            <key>color</key>
-            <value>red</value>
-          </Attributes>
-          <Attributes>
-            <key>size</key>
-            <value>large</value>
-          </Attributes>
-        </xml>
-        """
-        rules =
-          type: 'structure'
-          members:
-            Attributes:
-              type: 'map'
-              flattened: true
-        parse xml, rules, (data) ->
-          expect(data).toEqual({Attributes:{color:'red',size:'large'}})
+      describe 'flattened', ->
+        it 'expects key and value elements by default', ->
+          xml = """
+          <xml>
+            <Attributes>
+              <key>color</key>
+              <value>red</value>
+            </Attributes>
+            <Attributes>
+              <key>size</key>
+              <value>large</value>
+            </Attributes>
+          </xml>
+          """
+          rules =
+            type: 'strucure'
+            members:
+              Attributes:
+                type: 'map'
+                flattened: true
+          parse xml, rules, (data) ->
+            expect(data).toEqual({Attributes:{color:'red',size:'large'}})
 
-      it 'can use alternate names for key and value elements', ->
-        # using AttrName/AttrValue instead of key/value, also applied a name
-        # trait to the Attributes map
-        xml = """
-        <xml>
-          <Attribute>
-            <AttrName>age</AttrName>
-            <AttrValue>35</AttrValue>
-          </Attribute>
-          <Attribute>
-            <AttrName>height</AttrName>
-            <AttrValue>72</AttrValue>
-          </Attribute>
-        </xml>
-        """
-        rules =
-          type: 'structure'
-          members:
-            Attributes:
-              locationName: 'Attribute'
-              type: 'map'
-              flattened: true
-              key:
-                locationName: 'AttrName'
-              value:
-                locationName: 'AttrValue'
-                type: 'integer'
-        parse xml, rules, (data) ->
-          expect(data).toEqual({Attributes:{age:35,height:72}})
+        it 'can use alternate names for key and value elements', ->
+          # using AttrName/AttrValue instead of key/value, also applied a name
+          # trait to the Attributes map
+          xml = """
+          <xml>
+            <Attribute>
+              <AttrName>age</AttrName>
+              <AttrValue>35</AttrValue>
+            </Attribute>
+            <Attribute>
+              <AttrName>height</AttrName>
+              <AttrValue>72</AttrValue>
+            </Attribute>
+          </xml>
+          """
+          rules =
+            type: 'structure'
+            members:
+              Attribute:
+                name: 'Attributes'
+                type: 'map'
+                flattened: true
+                keys:
+                  name: 'AttrName'
+                members:
+                  name: 'AttrValue'
+                  type: 'integer'
+          parse xml, rules, (data) ->
+            expect(data).toEqual({Attributes:{age:35,height:72}})
 
   describe 'booleans', ->
 
@@ -451,12 +422,8 @@ describe 'AWS.XML.Parser', ->
       timestamp = 'bad-date-format'
       xml = "<xml><CreatedAt>#{timestamp}</CreatedAt></xml>"
       message = 'unhandled timestamp format: ' + timestamp
-      error = {}
-      try
-        parse(xml, rules, ->)
-      catch e
-        error = e
-      expect(error.message).toEqual(message)
+      error = { code: 'AWS.XML.Parser.Error', message: message }
+      expect(-> new AWS.XML.Parser(rules).parse(xml)).toThrow(error)
 
   describe 'numbers', ->
 
@@ -500,8 +467,8 @@ describe 'AWS.XML.Parser', ->
       rules =
         type: 'structure'
         members:
-            aka:
-              locationName: 'alias'
+            alias:
+              name: 'aka'
       xml = "<xml><alias>John Doe</alias></xml>"
       parse xml, rules, (data) ->
         expect(data).toEqual({aka:'John Doe'})
@@ -512,9 +479,8 @@ describe 'AWS.XML.Parser', ->
         members:
           person:
             members:
-              name: {}
-              aka:
-                locationName: 'alias'
+              alias:
+                name: 'aka'
       xml = "<xml><person><name>Joe</name><alias>John Doe</alias></person></xml>"
       parse xml, rules, (data) ->
         expect(data).toEqual({person:{name:'Joe',aka:'John Doe'}})
@@ -532,7 +498,7 @@ describe 'AWS.XML.Parser', ->
       </xml>
       """
       parse xml, rules, (data) ->
-        expect(data.Value.toString()).toEqual('foo')
+        expect(data).toEqual(Value:'foo')
       rules =
         type: 'structure'
         members:
@@ -543,7 +509,7 @@ describe 'AWS.XML.Parser', ->
       </xml>
       """
       parse xml, rules, (data) ->
-        expect(data.Value.toString()).toEqual('foo')
+        expect(data).toEqual(Value:'foo')
 
   describe 'elements with XML namespaces', ->
     it 'strips the xmlns element', ->
@@ -552,7 +518,7 @@ describe 'AWS.XML.Parser', ->
         members:
           List:
             type: 'list'
-            member:
+            members:
               type: 'structure'
               members:
                 Attr1: {}
@@ -578,10 +544,5 @@ describe 'AWS.XML.Parser', ->
     it 'throws an error when unable to parse the xml', ->
       xml = 'asdf'
       rules = {}
-      error = {}
-      try
-        new AWS.XML.Parser().parse(xml, rules)
-      catch e
-        error = e
-      expect(error.code).toEqual('XMLParserError')
+      expect(-> new AWS.XML.Parser(rules).parse(xml)).toThrow(AWS.XML.Parser.Error)
 

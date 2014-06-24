@@ -18,16 +18,17 @@ def sdk_version
 end
 
 namespace :browser do
-  $BUILDER = "./dist-tools/browser-builder.js"
-  $BROWSERIFY = "browserify"
+  $BUILDER = "./vendor/dist-tools/browser-builder.js"
+  $BROWSERIFY = "./vendor/dist-tools/node_modules/.bin/browserify"
   $BROWSERIFY_DIST = "dist/aws-sdk.js"
   $BROWSERIFY_TEST = "test/browser/build/tests.js"
 
   task :all => [:build, :test]
 
   task :setup_dist_tools do
-    unless File.directory?("dist-tools/node_modules")
-      sh "cd dist-tools && npm install --production"
+    unless File.directory?("vendor/dist-tools")
+      sh "git clone git://github.com/aws/aws-sdk-js-dist-tools vendor/dist-tools"
+      sh "cd vendor/dist-tools && npm install --production"
     end
   end
 
@@ -48,20 +49,20 @@ namespace :browser do
   task :build_server => [:setup_dist_tools] do
     version = ENV['VERSION'].sub(/^v/, '')
     raise "Missing version" unless version
-    root = "vendor/dist-server/sdks/v#{version}"
+    root = "vendor/dist-tools/sdks/v#{version}"
     mkdir_p(root)
     mkdir_p("#{root}/node_modules")
     cp_r "lib", root
     cp_r "node_modules/aws-sdk-apis", "#{root}/node_modules/aws-sdk-apis"
     cp_r "node_modules/xmlbuilder", "#{root}/node_modules/xmlbuilder"
     cp_r "node_modules/xml2js", "#{root}/node_modules/xml2js"
-    Dir.chdir("vendor/dist-server") do
+    Dir.chdir("vendor/dist-tools") do
       sh "node setup-versions v#{version}"
     end
   end
 
   desc 'Builds browser test harness and runner'
-  task :test => [:node10_only, :setup_dist_tools, :dist_path, :build_all] do
+  task :test => [:setup_dist_tools, :dist_path, :build_all] do
     write_configuration
     mkdir_p "test/browser/build"
     cp "dist/aws-sdk-all.js", "test/browser/build/aws-sdk-all.js"
@@ -76,14 +77,5 @@ namespace :browser do
 
   task :dist_path do
     mkdir_p 'dist'
-  end
-
-  task :node10_only do
-    version = `node -v`.chomp
-    v = version.split('.')
-    if v[0] == 'v0' && v[1].to_i < 10
-      puts "Skipping task #{ARGV[0]} due to unmet Node version (#{version} < v0.10.x)."
-      exit 0
-    end
   end
 end

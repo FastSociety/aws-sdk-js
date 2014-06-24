@@ -91,24 +91,7 @@ describe 'AWS.S3', ->
         req = build('listObjects', { Bucket: 'bucket', MaxKeys:123 })
         expect(req.path).toEqual('/?max-keys=123')
 
-    describe 'adding Content-Type', ->
-      beforeEach -> spyOn(AWS.util, 'isBrowser').andReturn(true)
-
-      it 'adds default content-type when not supplied', ->
-        req = build('putObject', Bucket: 'bucket', Key: 'key', Body: 'body')
-        expect(req.headers['Content-Type']).toEqual('application/octet-stream; charset=UTF-8')
-
-      it 'adds charset to existing content-type if not supplied', ->
-        req = build('putObject', Bucket: 'bucket', Key: 'key', Body: 'body', ContentType: 'text/html')
-        expect(req.headers['Content-Type']).toEqual('text/html; charset=UTF-8')
-
-      it 'normalized charset to uppercase', ->
-        req = build('putObject', Bucket: 'bucket', Key: 'key', Body: 'body', ContentType: 'text/html; charset=utf-8')
-        expect(req.headers['Content-Type']).toEqual('text/html; charset=UTF-8')
-
-      it 'does not add charset to non-string data', ->
-        req = build('putObject', Bucket: 'bucket', Key: 'key', Body: new Buffer('body'), ContentType: 'image/png')
-        expect(req.headers['Content-Type']).toEqual('image/png')
+      it 'ensures a single forward slash exists when querystring is present'
 
     describe 'virtual-hosted vs path-style bucket requests', ->
 
@@ -163,37 +146,6 @@ describe 'AWS.S3', ->
           req = build('listObjects', {Bucket:'bucket_name'})
           expect(req.endpoint.hostname).toEqual('s3.amazonaws.com')
           expect(req.path).toEqual('/bucket_name')
-
-  describe 'SSE support', ->
-    beforeEach -> s3 = new AWS.S3
-
-    it 'encodes SSECustomerKey and fills in MD5', ->
-      req = s3.putObject
-        Bucket: 'bucket', Key: 'key', Body: 'data'
-        SSECustomerKey: 'KEY', SSECustomerAlgorithm: 'AES256'
-      req.build()
-      expect(req.httpRequest.headers['x-amz-server-side-encryption-customer-key']).
-        toEqual('S0VZ')
-      expect(req.httpRequest.headers['x-amz-server-side-encryption-customer-key-MD5']).
-        toEqual('TzFsSjRNSnJoM1o2UjFLaWR0NlZjQT09')
-
-    it 'encodes CopySourceSSECustomerKey and fills in MD5', ->
-      req = s3.copyObject
-        Bucket: 'bucket', Key: 'key', CopySource: 'bucket/oldkey', Body: 'data'
-        CopySourceSSECustomerKey: 'KEY', CopySourceSSECustomerAlgorithm: 'AES256'
-      req.build()
-      expect(req.httpRequest.headers['x-amz-copy-source-server-side-encryption-customer-key']).
-        toEqual('S0VZ')
-      expect(req.httpRequest.headers['x-amz-copy-source-server-side-encryption-customer-key-MD5']).
-        toEqual('TzFsSjRNSnJoM1o2UjFLaWR0NlZjQT09')
-
-  describe 'retry behavior', ->
-    it 'retries RequestTimeout errors', ->
-      s3.config.maxRetries = 3
-      helpers.mockHttpResponse 400, {},
-        '<xml><Code>RequestTimeout</Code><Message>message</Message></xml>'
-      s3.putObject (err, data) ->
-        expect(@retryCount).toEqual(s3.config.maxRetries)
 
   # S3 returns a handful of errors without xml bodies (to match the
   # http spec) these tests ensure we give meaningful codes/messages for these.
@@ -254,7 +206,7 @@ describe 'AWS.S3', ->
           <AccessControlList>
             <Grant>
               <Grantee xsi:type="CanonicalUser" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-                <DisplayName>aws-sdk</DisplayName>
+                <DisplayName>aws-ruby-sdk</DisplayName>
                 <ID>id</ID>
               </Grantee>
               <Permission>FULL_CONTROL</Permission>
@@ -267,7 +219,7 @@ describe 'AWS.S3', ->
             </Grant>
           </AccessControlList>
           <Owner>
-            <DisplayName>aws-sdk</DisplayName>
+            <DisplayName>aws-ruby-sdk</DisplayName>
             <ID>id</ID>
           </Owner>
         </AccessControlPolicy>
@@ -277,20 +229,20 @@ describe 'AWS.S3', ->
         expect(error).toBe(null)
         expect(data).toEqual({
           Owner:
-            DisplayName: 'aws-sdk',
+            DisplayName: 'aws-ruby-sdk',
             ID: 'id'
           Grants: [
             {
               Permission: 'FULL_CONTROL'
               Grantee:
-                Type: 'CanonicalUser'
-                DisplayName: 'aws-sdk'
+                Type: 'CanonicalUser',
+                DisplayName: 'aws-ruby-sdk'
                 ID: 'id'
             },
             {
               Permission : 'READ'
               Grantee:
-                Type: 'Group'
+                Type: 'Group',
                 URI: 'uri'
             }
           ]
@@ -303,21 +255,21 @@ describe 'AWS.S3', ->
         <AccessControlPolicy xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
           <AccessControlList>
             <Grant>
-              <Grantee xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="CanonicalUser">
-                <DisplayName>aws-sdk</DisplayName>
+              <Grantee xsi:type="CanonicalUser" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                <DisplayName>aws-ruby-sdk</DisplayName>
                 <ID>id</ID>
               </Grantee>
               <Permission>FULL_CONTROL</Permission>
             </Grant>
             <Grant>
-              <Grantee xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="Group">
+              <Grantee xsi:type="Group" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
                 <URI>uri</URI>
               </Grantee>
               <Permission>READ</Permission>
             </Grant>
           </AccessControlList>
           <Owner>
-            <DisplayName>aws-sdk</DisplayName>
+            <DisplayName>aws-ruby-sdk</DisplayName>
             <ID>id</ID>
           </Owner>
         </AccessControlPolicy>
@@ -326,14 +278,14 @@ describe 'AWS.S3', ->
       params =
         AccessControlPolicy:
           Owner:
-            DisplayName: 'aws-sdk',
+            DisplayName: 'aws-ruby-sdk',
             ID: 'id'
           Grants: [
             {
               Permission: 'FULL_CONTROL'
               Grantee:
                 Type: 'CanonicalUser',
-                DisplayName: 'aws-sdk'
+                DisplayName: 'aws-ruby-sdk'
                 ID: 'id'
             },
             {
@@ -479,21 +431,16 @@ describe 'AWS.S3', ->
 
     it 'gets a signed URL for getObject', ->
       url = s3.getSignedUrl('getObject', Bucket: 'bucket', Key: 'key')
-      expect(url).toEqual('https://bucket.s3.amazonaws.com/key?AWSAccessKeyId=akid&Expires=900&Signature=4mlYnRmz%2BBFEPrgYz5tXcl9Wc4w%3D&x-amz-security-token=session')
+      expect(url).toEqual('https://bucket.s3.amazonaws.com/key?AWSAccessKeyId=akid&Expires=900&Signature=uefzBaGpqvO9QhGtT%2BbYda0pgQY%3D')
 
     it 'gets a signed URL with Expires time', ->
       url = s3.getSignedUrl('getObject', Bucket: 'bucket', Key: 'key', Expires: 60)
-      expect(url).toEqual('https://bucket.s3.amazonaws.com/key?AWSAccessKeyId=akid&Expires=60&Signature=kH2pMK%2Fgm7cCZKVG8GHVTRGXKzY%3D&x-amz-security-token=session')
+      expect(url).toEqual('https://bucket.s3.amazonaws.com/key?AWSAccessKeyId=akid&Expires=60&Signature=ZJKBOuhI99B2OZdkGSOmfG86BOI%3D')
 
     it 'gets a signed URL with expiration and bound bucket parameters', ->
       s3 = new AWS.S3(paramValidation: true, region: undefined, params: Bucket: 'bucket')
       url = s3.getSignedUrl('getObject', Key: 'key', Expires: 60)
-      expect(url).toEqual('https://bucket.s3.amazonaws.com/key?AWSAccessKeyId=akid&Expires=60&Signature=kH2pMK%2Fgm7cCZKVG8GHVTRGXKzY%3D&x-amz-security-token=session')
-
-    it 'generates the right URL with a custom endpoint', ->
-      s3 = new AWS.S3(endpoint: 'https://foo.bar.baz:555/prefix', params: Bucket: 'bucket')
-      url = s3.getSignedUrl('getObject', Key: 'key', Expires: 60)
-      expect(url).toEqual('https://bucket.foo.bar.baz:555/prefix/key?AWSAccessKeyId=akid&Expires=60&Signature=zA6k0cQqDkTZgLamfoYLOd%2Bqfg8%3D&x-amz-security-token=session')
+      expect(url).toEqual('https://bucket.s3.amazonaws.com/key?AWSAccessKeyId=akid&Expires=60&Signature=ZJKBOuhI99B2OZdkGSOmfG86BOI%3D')
 
     it 'gets a signed URL with callback', ->
       url = null
@@ -501,38 +448,37 @@ describe 'AWS.S3', ->
         s3.getSignedUrl 'getObject', Bucket: 'bucket', Key: 'key', (err, value) -> url = value
       waitsFor -> url
       runs ->
-        expect(url).toEqual('https://bucket.s3.amazonaws.com/key?AWSAccessKeyId=akid&Expires=900&Signature=4mlYnRmz%2BBFEPrgYz5tXcl9Wc4w%3D&x-amz-security-token=session')
+        expect(url).toEqual('https://bucket.s3.amazonaws.com/key?AWSAccessKeyId=akid&Expires=900&Signature=uefzBaGpqvO9QhGtT%2BbYda0pgQY%3D')
 
     it 'gets a signed URL for putObject with no body', ->
       url = s3.getSignedUrl('putObject', Bucket: 'bucket', Key: 'key')
-      expect(url).toEqual('https://bucket.s3.amazonaws.com/key?AWSAccessKeyId=akid&Expires=900&Signature=J%2BnWZ0lPUfLV0kio8ONhJmAttGc%3D&x-amz-security-token=session')
+      expect(url).toEqual('https://bucket.s3.amazonaws.com/key?AWSAccessKeyId=akid&Expires=900&Signature=h%2FphNvPoGxx9qq2U7Zhbfqgi0Xs%3D')
 
     it 'gets a signed URL for putObject with special characters', ->
       url = s3.getSignedUrl('putObject', Bucket: 'bucket', Key: '!@#$%^&*();\':"{}[],./?`~')
-      expect(url).toEqual('https://bucket.s3.amazonaws.com/%21%40%23%24%25%5E%26%2A%28%29%3B%27%3A%22%7B%7D%5B%5D%2C./%3F%60~?AWSAccessKeyId=akid&Expires=900&Signature=9nEltJACZKsriZqU2cmRel6g8LQ%3D&x-amz-security-token=session')
+      expect(url).toEqual('https://bucket.s3.amazonaws.com/%21%40%23%24%25%5E%26%2A%28%29%3B%27%3A%22%7B%7D%5B%5D%2C./%3F%60~?AWSAccessKeyId=akid&Expires=900&Signature=ymM%2F7R7Ri6bIXA7vrhzaaZgNRHg%3D')
 
     it 'gets a signed URL for putObject with a body (and checksum)', ->
       url = s3.getSignedUrl('putObject', Bucket: 'bucket', Key: 'key', Body: 'body')
-      expect(url).toEqual('https://bucket.s3.amazonaws.com/key?AWSAccessKeyId=akid&Content-MD5=hBotaJrYa9FhFEdFPCLG%2FA%3D%3D&Expires=900&Signature=4ycA2tpHKxfFnNCdqnK1d5BG8gc%3D&x-amz-security-token=session')
+      expect(url).toEqual('https://bucket.s3.amazonaws.com/key?AWSAccessKeyId=akid&Content-MD5=hBotaJrYa9FhFEdFPCLG%2FA%3D%3D&Expires=900&Signature=7%2BXiHEwB%2B3nSg2rhTyatSigkGPI%3D')
 
     it 'gets a signed URL and appends to existing query parameters', ->
       url = s3.getSignedUrl('listObjects', Bucket: 'bucket', Prefix: 'prefix')
-      expect(url).toEqual('https://bucket.s3.amazonaws.com/?AWSAccessKeyId=akid&Expires=900&Signature=8W3pwZPfgucCyPNg1MsoYq8h5zw%3D&prefix=prefix&x-amz-security-token=session')
+      expect(url).toEqual('https://bucket.s3.amazonaws.com/?prefix=prefix&AWSAccessKeyId=akid&Expires=900&Signature=fWeCHJBop4LyDXm2%2F%2BvR%2BqzH5zk%3D')
 
     it 'gets a signed URL for getObject using SigV4', ->
       s3 = new AWS.S3(signatureVersion: 'v4', region: undefined)
       url = s3.getSignedUrl('getObject', Bucket: 'bucket', Key: 'object')
-      expect(url).toEqual('https://bucket.s3.amazonaws.com/object?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=akid%2F19700101%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=19700101T000000Z&X-Amz-Expires=900&X-Amz-Security-Token=session&X-Amz-Signature=05ae40d2d22c93549a1de0686232ff56baf556876ec497d0d8349431f98b8dfe&X-Amz-SignedHeaders=host')
+      expect(url).toEqual('https://bucket.s3.amazonaws.com/object?X-Amz-Date=19700101T000000Z&X-Amz-Signature=1829997c9cea443f92ce0f1ab5debfb554c5d609b9110366a819f3fc8a0b71d5')
 
     it 'errors when expiry time is greater than a week out on SigV4', ->
-      err = null; data = null
+      err = null
       s3 = new AWS.S3(signatureVersion: 'v4', region: undefined)
       params = Bucket: 'bucket', Key: 'object', Expires: 60 * 60 * 24 * 7 + 120
-      error = 'Presigning does not support expiry time greater than a week with SigV4 signing.'
+      error = 'getSignedUrl() does not support expiry time greater than a week with SigV4 signing.'
       runs ->
-        s3.getSignedUrl 'getObject', params, (e, d) -> data = d; err = e
-      waitsFor -> err || data
+        s3.getSignedUrl 'getObject', params, (e, d) -> err = e
+      waitsFor -> err
       runs ->
-        expect(err).not.toEqual(null)
         expect(err.message).toEqual(error)
         #expect(-> s3.getSignedUrl('getObject', params)).toThrow(error) # sync mode

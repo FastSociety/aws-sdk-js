@@ -2,26 +2,22 @@ helpers = require('../helpers')
 AWS = helpers.AWS
 Buffer = AWS.util.Buffer
 
-svc = AWS.Protocol.Query
-describe 'AWS.Protocol.Query', ->
+describe 'AWS.ServiceInterface.Query', ->
   service = null
   request = null
   response = null
+  svc = eval(@description)
 
   beforeEach ->
     service = new AWS.Service apiConfig:
-      metadata:
-        endpointPrefix: 'mockservice'
-        apiVersion: '2012-01-01'
+      endpointPrefix: 'mockservice'
+      apiVersion: '2012-01-01'
       operations:
-        OperationName:
+        operationName:
           name: 'OperationName'
           input:
             members:
               Input:
-                type: 'string'
-              List:
-                type: 'list'
                 members: {}
           output:
             type: 'structure'
@@ -40,10 +36,10 @@ describe 'AWS.Protocol.Query', ->
   describe 'buildRequest', ->
     stringify = (params) -> AWS.util.queryParamsToString(params)
 
-    buildRequest = (input, list) ->
+    buildRequest = (input) ->
       if input == undefined
         input = 'foo+bar: yuck/baz=~'
-      request.params = Input: input, List: list
+      request.params = Input: input
       svc.buildRequest(request)
 
     it 'should use POST method requests', ->
@@ -84,10 +80,6 @@ describe 'AWS.Protocol.Query', ->
       buildRequest('')
       expect(stringify(request.httpRequest.params)).
         toMatch(/Input=($|&)/);
-
-    it 'serializes empty lists', ->
-      buildRequest(null, [])
-      expect(stringify(request.httpRequest.params)).toMatch(/[?&]List(&|$)/)
 
   describe 'extractError', ->
     extractError = (body) ->
@@ -175,8 +167,8 @@ describe 'AWS.Protocol.Query', ->
       expect(response.error).toEqual(null)
       expect(response.data).toEqual({Data:{Name:'abc',Count:'123'}})
 
-    it 'removes wrapping result element if resultWrapper is set', ->
-      service.api.operations.operationName.output.resultWrapper = 'OperationNameResult'
+    it 'removes wrapping result element if resultWrapped is set', ->
+      service.api.resultWrapped = true
       extractData """
       <xml>
         <OperationNameResult>
@@ -189,3 +181,13 @@ describe 'AWS.Protocol.Query', ->
       """
       expect(response.error).toEqual(null)
       expect(response.data).toEqual({Data:{Name:'abc',Count:12345.5}})
+
+    it 'does not fail if wrapping element is not present (resultWrapped=true)', ->
+      service.api.resultWrapped = true
+      extractData """
+      <xml>
+        <NotWrapped><Data>abc</Data></NotWrapped>
+      </xml>
+      """
+      expect(response.error).toEqual(null)
+      expect(response.data).toEqual({NotWrapped:{Data:'abc'}})

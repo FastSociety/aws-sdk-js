@@ -2,32 +2,24 @@ helpers = require('../helpers')
 AWS = helpers.AWS
 Buffer = AWS.util.Buffer
 
-svc = AWS.Protocol.Json
-describe 'AWS.Protocol.Json', ->
+describe 'AWS.ServiceInterface.Json', ->
 
   MockJSONClient = AWS.util.inherit AWS.Service,
     endpointPrefix: 'mockservice'
-    api: new AWS.Model.Api
-      metadata:
-        protocol: 'json'
-        targetPrefix: 'prefix'
+    api:
+      targetPrefix: 'prefix'
       operations:
-        OperationName:
+        operationName:
+          name: 'OperationName'
           input:
             type: 'structure'
             members: {}
-          output:
-            type: 'structure'
-            members:
-              i: type: 'integer'
-              b: type: 'binary'
-              s: type: 'string'
 
   AWS.Service.defineMethods(MockJSONClient)
 
   request = null
   response = null
-  service = null
+  svc = eval(@description)
 
   beforeEach ->
     service = new MockJSONClient(region: 'region')
@@ -63,15 +55,11 @@ describe 'AWS.Protocol.Json', ->
         toEqual('prefix.OperationName')
 
     it 'should set the body to JSON serialized params', ->
-      service.api.operations.operationName.input.members.foo =
-        new AWS.Model.Shape.create({type: 'string'}, api: service.api)
       request.params = foo: 'bar'
       buildRequest()
       expect(request.httpRequest.body).toEqual('{"foo":"bar"}')
 
     it 'should preserve numeric types', ->
-      service.api.operations.operationName.input.members.count =
-        new AWS.Model.Shape.create({type: 'integer'}, api: service.api)
       request.params = count: 3
       buildRequest()
       expect(request.httpRequest.body).toEqual('{"count":3}')
@@ -145,16 +133,9 @@ describe 'AWS.Protocol.Json', ->
       svc.extractData(response)
 
     it 'JSON parses http response bodies', ->
-      extractData '{"i":1, "b":"AQID"}'
+      extractData '{"a":1, "b":"xyz"}'
       expect(response.error).toEqual(null)
-      expect(response.data.i).toEqual(1)
-      expect(response.data.b.toString()).toEqual('\u0001\u0002\u0003')
-
-    it 'returns raw data if convertResponseTypes is false', ->
-      service.config.convertResponseTypes = false
-      extractData '{"i":1, "b":"AQID"}'
-      expect(response.data.i).toEqual(1)
-      expect(response.data.b.toString()).toEqual('AQID')
+      expect(response.data).toEqual({a:1, b:'xyz'})
 
     it 'returns an empty object when the body is an empty string', ->
       extractData ''

@@ -10,11 +10,11 @@ def root
 end
 
 def models_path
-  File.join(root, 'vendor', 'apis', 'apis')
+  File.join(root, 'vendor', 'apis', 'apis', 'source')
 end
 
 def service_name(api)
-  name = api['metadata']['serviceAbbreviation'] || api['metadata']['serviceFullName']
+  name = api['service_abbreviation'] || api['service_full_name']
   name = name.gsub(/^Amazon|AWS\s*|\(.*|\s+|\W+/, '')
 
   # Hack for special service names
@@ -25,11 +25,12 @@ def service_name(api)
 end
 
 def add_tasks(model)
-  model_path = File.join(models_path, model)
+  model = model.gsub(/\.json$/, '')
+  model_path = File.join(models_path, "#{model}.json")
   api = JSON.parse(File.read(model_path), :max_nesting => false)
   klass = service_name(api)
   service = klass.downcase
-  version = api['metadata']['apiVersion']
+  version = api['api_version']
 
   namespace :api do
     task :versions
@@ -59,15 +60,15 @@ def add_tasks(model)
       end
 
       task(:version) do
-        puts("%-40s\t%s" % [api['metadata']['serviceFullName'], version])
+        puts("%-40s\t%s" % [api['service_full_name'], version])
       end
 
       task(:'version:internal') do
-        ($apis[api['metadata']['serviceFullName']] ||= []) << [version, klass]
+        ($apis[api['service_full_name']] ||= []) << [version, klass]
       end
 
       task(:'version:html') do
-        puts "<tr>\n  <td>#{api['metadata']['serviceFullName']}</td>"
+        puts "<tr>\n  <td>#{api['service_full_name']}</td>"
         puts "  <td>#{version}</td>\n  <td>AWS.#{klass}</td>\n</tr>"
       end
 
@@ -117,6 +118,6 @@ end
 desc 'Builds the API for each service.'
 task :api => 'api:all'
 
-Dir.glob(File.join(models_path, '*.api.json')).sort.each do |file|
+Dir.glob(File.join(models_path, '*.json')).sort.each do |file|
   add_tasks(File.basename(file))
 end

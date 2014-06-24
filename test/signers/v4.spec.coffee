@@ -6,7 +6,7 @@ beforeEach ->
 
 buildRequest = ->
   ddb = new AWS.DynamoDB({region: 'region', endpoint: 'localhost', apiVersion: '2011-12-05'})
-  ddb.makeRequest('listTables', {ExclusiveStartTableName: 'bår'}).build().httpRequest
+  ddb.makeRequest('listTables', {foo: 'bår'}).build().httpRequest
 
 buildSigner = (request) ->
   return new AWS.Signers.V4(request || buildRequest(), 'dynamodb')
@@ -15,9 +15,9 @@ describe 'AWS.Signers.V4', ->
   date = new Date(1935346573456)
   datetime = AWS.util.date.iso8601(date).replace(/[:\-]|\.\d{3}/g, '')
   creds = null
-  signature = 'be723920bdf3f2ee6c0299adeafd5bc875cca511e2a4b8374d0d4e229acf2931'
+  signature = '838c924736f5ce488c99f0955097c9571544d84968102543edc9b01dfaa7ef16'
   authorization = 'AWS4-HMAC-SHA256 Credential=akid/20310430/region/dynamodb/aws4_request, ' +
-    'SignedHeaders=host;x-amz-date;x-amz-security-token;x-amz-target, ' +
+    'SignedHeaders=content-length;host;x-amz-date;x-amz-security-token;x-amz-target, ' +
     'Signature=' + signature
   signer = null
 
@@ -35,7 +35,7 @@ describe 'AWS.Signers.V4', ->
   describe 'addAuthorization', ->
     headers = {
       'Content-Type': 'application/x-amz-json-1.0',
-      'Content-Length': 34,
+      'Content-Length': 14,
       'X-Amz-Target': 'DynamoDB_20111205.ListTables',
       'Host': 'localhost',
       'X-Amz-Date': datetime,
@@ -104,6 +104,7 @@ describe 'AWS.Signers.V4', ->
   describe 'canonicalHeaders', ->
     it 'should return headers', ->
       expect(signer.canonicalHeaders()).toEqual [
+        'content-length:14',
         'host:localhost',
         'x-amz-date:' + datetime,
         'x-amz-security-token:session',

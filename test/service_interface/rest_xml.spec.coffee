@@ -2,133 +2,140 @@ helpers = require('../helpers')
 AWS = helpers.AWS
 Buffer = AWS.util.Buffer
 
-svc = AWS.Protocol.RestXml
-describe 'AWS.Protocol.RestXml', ->
+describe 'AWS.ServiceInterface.RestXml', ->
 
   MockRESTXMLService = AWS.util.inherit AWS.Service,
     endpointPrefix: 'mockservice'
 
   xmlns = 'http://mockservice.com/xmlns'
+  operation = null
   request = null
   response = null
-  service = null
+  svc = eval(@description)
 
   beforeEach ->
-    MockRESTXMLService.prototype.api = new AWS.Model.Api
-      metadata:
-        xmlNamespace: xmlns
+    MockRESTXMLService.prototype.api =
+      xmlnamespace: xmlns
       operations:
-        SampleOperation:
+        sampleOperation:
           http:
-            method: 'POST'
-            requestUri: '/'
+            method: 'POST' # http method
+            uri: '/'    # uri
+          input:
+            type: 'structure'
+            members: {}
+          output:
+            type: 'structure'
+            members: {}
 
     AWS.Service.defineMethods(MockRESTXMLService)
+    operation = MockRESTXMLService.prototype.api.operations.sampleOperation
     service = new MockRESTXMLService(region: 'region')
     request = new AWS.Request(service, 'sampleOperation')
     response = request.response
 
-  defop = (op) ->
-    AWS.util.property(service.api.operations, 'sampleOperation',
-      new AWS.Model.Operation('sampleOperation', op, api: service.api))
-
   describe 'buildRequest', ->
-    build = -> svc.buildRequest(request); request
+    buildRequest = (callback) ->
+      if callback
+        callback()
+      svc.buildRequest(request)
 
     describe 'empty bodies', ->
       it 'defaults body to empty string when there are no inputs', ->
-        defop input: type: 'structure', members: {}
-        expect(build().httpRequest.body).toEqual('')
+        buildRequest ->
+          operation.input =
+            type: 'structure'
+            members: {}
+        expect(request.httpRequest.body).toEqual('')
 
       it 'defaults body to empty string when no body params are present', ->
-        request.params = Bucket: 'abc', ACL: 'canned-acl'
-        defop
-          http: requestUri: '/{Bucket}'
-          input:
-            type: 'structure'
+        buildRequest ->
+          operation.http.uri = '/{Bucket}'
+          operation.input =
             members:
               Bucket:
                 location: 'uri'
+                required: true
               ACL:
-                locationName: 'x-amz-acl'
+                name: 'x-amz-acl'
                 location: 'header'
-
-        build()
+          request.params = Bucket: 'abc', ACL: 'canned-acl'
         expect(request.httpRequest.body).toEqual('')
         expect(request.httpRequest.path).toEqual('/abc')
         expect(request.httpRequest.headers['x-amz-acl']).toEqual('canned-acl')
 
     describe 'string bodies', ->
       it 'populates the body with string types directly', ->
-        request.params = Bucket: 'bucket-name', Data: 'abc'
-        defop
-          http: requestUri: '/{Bucket}'
-          input:
+        buildRequest ->
+          operation.http.uri = '/{Bucket}'
+          operation.input =
             payload: 'Data'
             members:
               Bucket:
                 location: 'uri'
+                required: true
               Data:
                 type: 'string'
-        expect(build().httpRequest.body).toEqual('abc')
+          request.params = Bucket: 'bucket-name', Data: 'abc'
+        expect(request.httpRequest.body).toEqual('abc')
 
     describe 'xml bodies', ->
       it 'populates the body with XML from the params', ->
-        request.params =
-          ACL: 'canned-acl'
-          Config:
-            Abc: 'abc'
-            Locations: ['a', 'b', 'c']
-            Data: [
-              { Foo:'foo1', Bar:'bar1' },
-              { Foo:'foo2', Bar:'bar2' },
-            ]
-          Bucket: 'bucket-name'
-          Marker: 'marker'
-          Limit: 123
-          Metadata:
-            abc: 'xyz'
-            mno: 'hjk'
-        defop
-          http: requestUri: '/{Bucket}'
-          input:
+        buildRequest ->
+          operation.http.uri = '/{Bucket}?next-marker={Marker}&limit={Limit}'
+          operation.input =
             payload: 'Config'
             members:
               Bucket: # uri path param
                 type: 'string'
                 location: 'uri'
+                required: true
               Marker: # uri querystring param
                 type: 'string'
-                location: 'querystring'
-                locationName: 'next-marker'
+                location: 'uri'
               Limit: # uri querystring integer param
                 type: 'integer'
-                location: 'querystring'
-                locationName: 'limit'
+                location: 'uri'
               ACL: # header string param
                 type: 'string'
                 location: 'header'
-                locationName: 'x-amz-acl'
+                name: 'x-amz-acl'
               Metadata: # header map param
                 type: 'map'
-                location: 'headers'
-                locationName: 'x-amz-meta-'
+                location: 'header'
+                name: 'x-amz-meta-'
               Config: # structure of mixed tpyes
                 type: 'structure'
+                required: true
                 members:
-                  Abc: type: 'string'
+                  Abc: {} # string
                   Locations: # array of strings
                     type: 'list'
-                    member:
+                    members:
                       type: 'string'
-                      locationName: 'Location'
+                      name: 'Location'
                   Data: # array of structures
                     type: 'list'
-                    member:
+                    members:
                       type: 'structure'
                       members:
-                        Foo: type: 'string'
-                        Bar: type: 'string'
+                        Foo: {}
+                        Bar: {}
+          request.params =
+            ACL: 'canned-acl'
+            Config:
+              Abc: 'abc'
+              Locations: ['a', 'b', 'c']
+              Data: [
+                { Foo:'foo1', Bar:'bar1' },
+                { Foo:'foo2', Bar:'bar2' },
+              ]
+            Bucket: 'bucket-name'
+            Marker: 'marker'
+            Limit: 123
+            Metadata:
+              abc: 'xyz'
+              mno: 'hjk'
         xml = """
         <Config xmlns="http://mockservice.com/xmlns">
           <Abc>abc</Abc>
@@ -149,51 +156,26 @@ describe 'AWS.Protocol.RestXml', ->
           </Data>
         </Config>
         """
-
-        build()
         expect(request.httpRequest.method).toEqual('POST')
         expect(request.httpRequest.path).
-          toEqual('/bucket-name?limit=123&next-marker=marker')
+          toEqual('/bucket-name?next-marker=marker&limit=123')
         expect(request.httpRequest.headers['x-amz-acl']).toEqual('canned-acl')
         expect(request.httpRequest.headers['x-amz-meta-abc']).toEqual('xyz')
         expect(request.httpRequest.headers['x-amz-meta-mno']).toEqual('hjk')
         helpers.matchXML(request.httpRequest.body, xml)
 
       it 'omits the body xml when body params are not present', ->
-        request.params = Bucket:'abc' # omitting Config purposefully
-        defop
-          http: requestUri: '/{Bucket}'
-          input:
+        buildRequest ->
+          operation.http.uri = '/{Bucket}'
+          operation.input =
             members:
               Bucket:
                 location: 'uri'
+                required: true
               Config: {}
-
-        build()
+          request.params = Bucket:'abc' # omitting Config purposefully
         expect(request.httpRequest.body).toEqual('')
         expect(request.httpRequest.path).toEqual('/abc')
-
-    it 'uses payload member name for payloads', ->
-      request.params =
-        Data:
-          Member1: 'member1'
-          Member2: 'member2'
-      defop
-        input:
-          payload: 'Data'
-          members:
-            Data:
-              type: 'structure'
-              locationName: 'RootElement'
-              members:
-                Member1: type: 'string'
-                Member2: type: 'string'
-      helpers.matchXML build().httpRequest.body, """
-        <RootElement xmlns="http://mockservice.com/xmlns">
-          <Member1>member1</Member1>
-          <Member2>member2</Member2>
-        </RootElement>
-      """
 
   describe 'extractError', ->
     extractError = (body) ->
@@ -251,14 +233,14 @@ describe 'AWS.Protocol.RestXml', ->
       svc.extractData(response)
 
     it 'parses the xml body', ->
-      defop output:
+      operation.output =
         type: 'structure'
         members:
           Foo: {}
           Bar:
             type: 'list'
-            member:
-              locationName: 'Item'
+            members:
+              name: 'Item'
       extractData """
       <xml>
         <Foo>foo</Foo>
@@ -272,7 +254,7 @@ describe 'AWS.Protocol.RestXml', ->
       expect(response.data).toEqual({Foo:'foo', Bar:['a', 'b', 'c']})
 
     it 'sets payload element to a Buffer object when it streams', ->
-      defop output:
+      operation.output =
         type: 'structure'
         payload: 'Body'
         members:
@@ -283,11 +265,11 @@ describe 'AWS.Protocol.RestXml', ->
       expect(response.data.Body.toString()).toEqual('Buffer data')
 
     it 'sets payload element to String when it does not stream', ->
-      defop output:
+      operation.output =
         type: 'structure'
         payload: 'Body'
         members:
-          Body: type: 'string'
+          Body: {}
       extractData 'Buffer data'
       expect(typeof response.data.Body).toEqual('string')
       expect(response.data.Body).toEqual('Buffer data')
@@ -295,16 +277,16 @@ describe 'AWS.Protocol.RestXml', ->
     it 'sets payload element along with other outputs', ->
       response.httpResponse.headers['x-amz-foo'] = 'foo'
       response.httpResponse.headers['x-amz-bar'] = 'bar'
-      defop output:
+      operation.output =
         type: 'structure'
         payload: 'Baz'
         members:
           Foo:
             location: 'header'
-            locationName: 'x-amz-foo'
+            name: 'x-amz-foo'
           Bar:
             location: 'header'
-            locationName: 'x-amz-bar'
+            name: 'x-amz-bar'
           Baz: {}
       extractData 'Buffer data'
       expect(response.data.Foo).toEqual('foo')

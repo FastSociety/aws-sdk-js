@@ -8,9 +8,6 @@ describe 'AWS.STS', ->
     sts = new AWS.STS()
 
   describe 'credentialsFrom', ->
-    it 'returns null if no data is provided', ->
-      expect(sts.credentialsFrom(null)).toEqual(null)
-
     it 'creates a TemporaryCredentials object with hydrated data', ->
       creds = sts.credentialsFrom Credentials:
          AccessKeyId: 'KEY'
@@ -46,7 +43,7 @@ describe 'AWS.STS', ->
       helpers.mockHttpResponse 200, {}, '{}'
       params = RoleArn: 'ARN', RoleSessionName: 'NAME', WebIdentityToken: 'TOK'
       service.assumeRoleWithWebIdentity params, ->
-        hr = this.request.httpRequest
+        hr = @request.httpRequest
         expect(hr.method).toEqual('GET')
         expect(hr.body).toEqual('')
         expect(hr.headers['Authorization']).toEqual(undefined)
@@ -62,7 +59,7 @@ describe 'AWS.STS', ->
       helpers.mockHttpResponse 200, {}, '{}'
       params = RoleArn: 'ARN', PrincipalArn: 'PARN', SAMLAssertion: 'OK'
       service.assumeRoleWithSAML params, ->
-        hr = this.request.httpRequest
+        hr = @request.httpRequest
         expect(hr.method).toEqual('GET')
         expect(hr.body).toEqual('')
         expect(hr.headers['Authorization']).toEqual(undefined)

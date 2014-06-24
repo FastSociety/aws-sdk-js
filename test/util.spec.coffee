@@ -61,9 +61,6 @@ describe 'AWS.util.queryParamsToString', ->
   it 'escapes list values', ->
     expect(qpts(a: ['+', '&', '*'], b: '4')).toEqual('a=%26&a=%2A&a=%2B&b=4')
 
-  it 'does not provide value if value is null', ->
-    expect(qpts(a: null, b: null)).toEqual('a&b')
-
 describe 'AWS.util.date', ->
 
   util = AWS.util.date
@@ -153,22 +150,6 @@ describe 'AWS.util.string', ->
 
       expect(err.message).toMatch(/Cannot determine length of /)
       expect(err.object).toBe(object)
-
-describe 'AWS.util.ini', ->
-  describe 'parse', ->
-    it 'parses an ini file', ->
-      ini = '''
-      ; comment at the beginning of the line
-      [section1] ; comment at end of line
-      invalidline
-      key1=value1 ; another comment
-        key2 = value2;value3
-      [emptysection]
-      '''
-      map = AWS.util.ini.parse(ini)
-      expect(map.section1.key1).toEqual('value1')
-      expect(map.section1.key2).toEqual('value2;value3')
-      expect(map.emptysection).toBe(undefined)
 
 describe 'AWS.util.buffer', ->
   describe 'concat', ->
@@ -452,8 +433,8 @@ describe 'AWS.util.base64', ->
 
   describe 'decode', ->
     it 'decodes the given string', ->
-      expect(base64.decode('Zm9v').toString()).toEqual('foo')
-      expect(base64.decode('0ZHFnQ==').toString()).toEqual('ёŝ')
+      expect(base64.decode('Zm9v')).toEqual('foo')
+      expect(base64.decode('0ZHFnQ==')).toEqual('ёŝ')
 
 describe 'AWS.util.jamespath', ->
   query = AWS.util.jamespath.query

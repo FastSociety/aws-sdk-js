@@ -19,7 +19,6 @@ AWS.config.update
   credentials:
     accessKeyId: 'akid'
     secretAccessKey: 'secret'
-    sessionToken: 'session'
 
 # Disable setTimeout for tests
 # Warning: this might cause unpredictable results
@@ -49,7 +48,7 @@ MockService = AWS.Service.defineService 'mockService',
       resp.error =
         code: resp.httpResponse.body.toString() || resp.httpResponse.statusCode
         message: null
-  api: new AWS.Model.Api metadata:
+  api:
     endpointPrefix: 'mockservice'
     signatureVersion: 'v4'
 
@@ -137,7 +136,6 @@ mockResponses = (svc, resps) ->
 
 module.exports =
   AWS: AWS
-  util: AWS.util
   matchXML: matchXML
   mockHttpResponse: mockHttpResponse
   mockIntermittentFailureResponse: mockIntermittentFailureResponse
@@ -145,4 +143,3 @@ module.exports =
   mockResponse: mockResponse
   mockResponses: mockResponses
   MockService: MockService
-

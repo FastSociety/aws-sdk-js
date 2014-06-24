@@ -44,12 +44,10 @@
               <li><a href="https://forums.aws.amazon.com/forum.jspa?forumID=148">Forum</a></li>
               <li><a href="https://github.com/aws/aws-sdk-js/issues">Issues</a></li>
           </ul>
-          <!-- BEGIN-SECTION -->
           <div id="github-stars">
               <iframe src="http://ghbtns.com/github-btn.html?user=aws&repo=aws-sdk-js&type=watch&count=true&size=small"
                       allowtransparency="true" frameborder="0" scrolling="0" width="110px" height="20px"></iframe>
           </div>
-          <!-- END-SECTION -->
       </div>
     </div>
 
@@ -60,7 +58,19 @@
         <div class="documentwrapper">
           <div class="bodywrapper">
             <div class="body">
-              <!--REGION_DISCLAIMER_DO_NOT_REMOVE-->
+              <style type="text/css">
+                #capabilities-banner { margin-bottom: 12px; font-weight: bold; padding: 12px; }
+              </style>
+              <div id="capabilities-banner" class="note">
+                AWS services or capabilities described in AWS Documentation may vary
+                by region/location. Click <a href="http://docs.amazonaws.cn/en_us/aws/latest/userguide/api.html">Getting Started with Amazon AWS</a>
+                to see specific differences applicable to the China (Beijing) Region.
+              </div>
+              <script type="text/javascript">
+                if (!window.location.hostname.match(/\.cn$/)) {
+                  document.getElementById('capabilities-banner').style.display = 'none';
+                }
+              </script>
 
               <div class="section">
                 <%= yieldall %>
